@@ -1,69 +1,204 @@
-import Image from "next/image";
+
+"use client";
+
+import { useState, type FormEvent } from "react";
+
+type Message = {
+  role: "user" | "assistant";
+  text: string;
+  sources?: string[];
+};
 
 export default function Home() {
+  const [question, setQuestion] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const submittedQuestion = question.trim();
+
+    if (!submittedQuestion || loading) return;
+
+    setMessages((previous) => [
+      ...previous,
+      { role: "user", text: submittedQuestion },
+    ]);
+    setQuestion("");
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          question: submittedQuestion,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          [data.error, data.details].filter(Boolean).join(" — ") ||
+            `Request failed with status ${response.status}.`
+        );
+      }
+
+      if (typeof data.answer !== "string") {
+        throw new Error("The server did not return an answer.");
+      }
+
+      setMessages((previous) => [
+        ...previous,
+        {
+          role: "assistant",
+          text: data.answer,
+          sources: Array.isArray(data.sources)
+            ? data.sources
+            : [],
+        },
+      ]);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not connect to the chat API."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const suggestions = [
+    "Which technologies does this project use?",
+    "How does document retrieval work?",
+    "What is the purpose of this project?",
+  ];
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="min-h-screen bg-slate-950 text-white">
+      <div className="mx-auto flex min-h-screen w-full max-w-4xl flex-col px-4 py-8 sm:px-6">
+        <header className="mb-8">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-400">
+            RAG · Gemini · Knowledge Search
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+          <h1 className="mt-3 text-3xl font-bold sm:text-4xl">
+            Knowledge Assistant
+          </h1>
+
+          <p className="mt-3 text-slate-400">
+            Ask questions and get answers grounded in your documents.
+          </p>
+        </header>
+
+        <section
+          aria-label="Conversation"
+          aria-live="polite"
+          className="flex-1 space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-6"
+        >
+          {messages.length === 0 && (
+            <div className="rounded-xl border border-dashed border-slate-700 p-6">
+              <p className="font-medium text-white">
+                Try asking:
+              </p>
+
+              <div className="mt-3 space-y-3">
+                {suggestions.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    className="block text-left text-cyan-300 hover:underline"
+                    onClick={() => setQuestion(suggestion)}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {messages.map((message, index) => (
+            <article
+              key={`${message.role}-${index}`}
+              className={`rounded-xl p-4 ${
+                message.role === "user"
+                  ? "ml-4 bg-cyan-950/70 sm:ml-12"
+                  : "mr-4 bg-slate-800 sm:mr-12"
+              }`}
+            >
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                {message.role === "user"
+                  ? "You"
+                  : "Knowledge Assistant"}
+              </p>
+
+              <p className="whitespace-pre-wrap leading-7">
+                {message.text}
+              </p>
+
+              {!!message.sources?.length && (
+                <div className="mt-4 border-t border-slate-700 pt-3">
+                  <p className="text-xs font-semibold text-cyan-300">
+                    Retrieved sources
+                  </p>
+
+                  <ul className="mt-2 list-inside list-disc text-sm text-slate-300">
+                    {message.sources.map((source) => (
+                      <li key={source}>{source}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </article>
+          ))}
+
+          {loading && (
+            <p role="status" className="animate-pulse text-cyan-300">
+              Searching documents and generating your answer...
+            </p>
+          )}
+
+          {error && (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-800 bg-red-950/50 p-3 text-red-200"
+            >
+              <p className="font-semibold">Request failed</p>
+              <p className="mt-1 break-words text-sm">{error}</p>
+            </div>
+          )}
+        </section>
+
+        <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
+          <input
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
+            maxLength={1000}
+            placeholder="Ask about your documents..."
+            aria-label="Your question"
+            className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 outline-none focus:border-cyan-400"
+          />
+
+          <button
+            type="submit"
+            disabled={loading || !question.trim()}
+            className="rounded-xl bg-cyan-500 px-5 py-3 font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            {loading ? "Thinking..." : "Ask"}
+          </button>
+        </form>
+
+        <p className="mt-3 text-center text-xs text-slate-500">
+          Answers are generated from retrieved documents and may need verification.
+        </p>
+      </div>
+    </main>
   );
 }

@@ -1,0 +1,25 @@
+RAG AI KNOWLEDGE ASSISTANT - PROJECT GUIDE
+
+Project Purpose:
+This application answers questions using a collection of knowledge documents. It combines a large language model with Retrieval-Augmented Generation (RAG).
+
+Technology Stack:
+The frontend uses Next.js, React, TypeScript, and Tailwind CSS. The backend uses Next.js API routes. Google Gemini generates answers, and Gemini embeddings convert document text and user questions into numerical vectors for semantic search.
+
+Document Processing:
+The knowledge base contains text documents. Each document is divided into smaller overlapping chunks. Each chunk is converted into an embedding and associated with its source filename.
+
+Retrieval Process:
+When a user asks a question, the application creates an embedding for the question. It compares that vector with document vectors using cosine similarity and selects the most relevant passages.
+
+Answer Generation:
+The retrieved passages are supplied to Gemini as context. The system prompt instructs the model to answer using the provided evidence, cite source filenames, and admit when the answer is unavailable.
+
+Security:
+The Gemini API key is stored in the server-side environment variable GEMINI_API_KEY. It must not be exposed in client-side code or committed to a public repository.
+
+Testing:
+Retrieval is tested with questions about specific facts in the knowledge base. The application should return relevant evidence and source filenames. Questions about information absent from the documents should receive an appropriate uncertainty response.
+
+Current Project Status:
+The initial version is being developed locally before deployment. The next stages include the chat interface, retrieval pipeline, error handling, testing, and deployment.
